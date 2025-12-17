@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String?        @unique
+  phone         String?        @unique
+  name          String?
+  subscriptions Subscription[]
+  payments      Payment[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Plan {
+  id            String         @id @default(cuid())
+  name          String
+  description   String?
+  price         Int
+  currency      String         @default("IRR")
+  duration      Int
+  features      String?
+  isActive      Boolean        @default(true)
+  subscriptions Subscription[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Subscription {
+  id        String             @id @default(cuid())
+  userId    String
+  user      User               @relation(fields: [userId], references: [id])
+  planId    String
+  plan      Plan               @relation(fields: [planId], references: [id])
+  status    String             @default("PENDING") // PENDING, ACTIVE, EXPIRED, CANCELLED
+  startDate DateTime?
+  endDate   DateTime?
+  autoRenew Boolean            @default(false)
+  payments  Payment[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+model Payment {
+  id               String       @id @default(cuid())
+  subscriptionId   String
+  subscription     Subscription @relation(fields: [subscriptionId], references: [id])
+  userId           String?
+  user             User?        @relation(fields: [userId], references: [id])
+  amount           Int
+  currency         String
+  gateway          String
+  authority        String       @unique
+  paymentUrl       String
+  status           String       @default("PENDING") // PENDING, COMPLETED, FAILED
+  gatewayTxId      String?
+  paidAt           DateTime?
+  verifiedAt       DateTime?
+  notificationSent Boolean      @default(false)
+  metadata         String?
+  userEmail        String?
+  userPhone        String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
