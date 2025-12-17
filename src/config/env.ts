@@ -20,7 +20,11 @@ const envSchema = z.object({
   }),
   SMS: z.object({
     API_KEY: z.string().optional(),
-    SENDER: z.string().optional(),
+    PATTERN_CODE: z.string().optional(),
+  }),
+  RESEND: z.object({
+    API_KEY: z.string().optional(),
+    FROM: z.string().optional(),
   }),
   EMAIL: z.object({
     HOST: z.string().optional(),
@@ -48,7 +52,11 @@ const parsedEnv = {
   },
   SMS: {
     API_KEY: process.env.SMS_API_KEY,
-    SENDER: process.env.SMS_SENDER,
+    PATTERN_CODE: process.env.SMS_PATTERN_CODE,
+  },
+  RESEND: {
+    API_KEY: process.env.RESEND_API_KEY,
+    FROM: process.env.RESEND_FROM,
   },
   EMAIL: {
     HOST: process.env.SMTP_HOST,

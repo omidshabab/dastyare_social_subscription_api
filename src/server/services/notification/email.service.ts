@@ -1,34 +1,31 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { env } from '../../../config/env';
 
 export class EmailService {
-  private transporter: nodemailer.Transporter;
+  private resend?: Resend;
 
   constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: env.EMAIL.HOST,
-      port: env.EMAIL.PORT,
-      secure: env.EMAIL.PORT === 465, // true for 465, false for other ports
-      auth: {
-        user: env.EMAIL.USER,
-        pass: env.EMAIL.PASS,
-      },
-    });
+    if (env.RESEND.API_KEY) {
+      this.resend = new Resend(env.RESEND.API_KEY);
+    }
   }
 
   async sendEmail(to: string, subject: string, html: string): Promise<void> {
     try {
-      if (!env.EMAIL.HOST || !env.EMAIL.USER) {
+      if (!this.resend) {
         console.log(`[Email Service] Would send to ${to}: ${subject}`);
         return;
       }
 
-      await this.transporter.sendMail({
-        from: env.EMAIL.FROM,
+      const { error } = await this.resend.emails.send({
+        from: env.RESEND.FROM || env.EMAIL.FROM || 'no-reply@resend.dev',
         to,
         subject,
         html,
       });
+      if (error) {
+        throw error;
+      }
       console.log(`[Email Service] Email sent to ${to}`);
     } catch (error: any) {
       console.error('[Email Service] Failed to send email:', error.message);

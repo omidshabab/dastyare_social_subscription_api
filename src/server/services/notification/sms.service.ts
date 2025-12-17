@@ -13,11 +13,11 @@ import { env } from '../../../config/env';
 export class SmsService {
   private apiKey: string | undefined;
   private sender: string | undefined;
-  private baseUrl = 'https://api.kavenegar.com/v1';
+  private baseUrl = 'https://edge.ippanel.com/v1';
 
   constructor() {
     this.apiKey = env.SMS.API_KEY;
-    this.sender = env.SMS.SENDER;
+    this.sender = undefined;
   }
 
   /**
@@ -29,28 +29,62 @@ export class SmsService {
    */
   async sendSms(phone: string, message: string): Promise<void> {
     try {
-      // If SMS API key is not configured, just log the message
-      // This is useful for development/testing
-      if (!this.apiKey || this.apiKey === 'your-sms-api-key') {
+      if (!this.apiKey) {
         console.log(`[SMS Service] Would send to ${phone}: ${message}`);
         return;
       }
-
-      // Construct the API endpoint URL with the API key
-      const url = `${this.baseUrl}/${this.apiKey}/sms/send.json`;
-
-      // Make the API request to Kavenegar
-      await axios.post(url, {
-        sender: this.sender,
-        receptor: phone,
-        message: message,
+      const url = `${this.baseUrl}/messages/send`;
+      const payload: any = {
+        recipients: [phone],
+        message,
+      };
+      if (this.sender) {
+        payload.originator = this.sender;
+      }
+      await axios.post(url, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `${this.apiKey}`,
+        },
       });
-
       console.log(`[SMS Service] SMS sent successfully to ${phone}`);
     } catch (error: any) {
       console.error('[SMS Service] Failed to send SMS:', error.message);
-      // We don't throw here because SMS failure shouldn't break the payment flow
-      // The payment link is also available in the API response
+    }
+  }
+
+  private async sendPattern(
+    patternCode: string | undefined,
+    phone: string,
+    values: Record<string, string>
+  ): Promise<void> {
+    if (!patternCode) {
+      await this.sendSms(phone, Object.values(values).join(' '));
+      return;
+    }
+    try {
+      if (!this.apiKey) {
+        console.log(`[SMS Service] Would send pattern ${patternCode} to ${phone}:`, values);
+        return;
+      }
+      const url = `${this.baseUrl}/messages/patterns/send`;
+      const payload: any = {
+        pattern_code: patternCode,
+        recipient: phone,
+        values,
+      };
+      if (this.sender) {
+        payload.originator = this.sender;
+      }
+      await axios.post(url, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `${this.apiKey}`,
+        },
+      });
+      console.log(`[SMS Service] Pattern SMS sent successfully to ${phone}`);
+    } catch (error: any) {
+      console.error('[SMS Service] Failed to send Pattern SMS:', error.message);
     }
   }
 
@@ -70,12 +104,13 @@ export class SmsService {
     planName: string,
     amount: number
   ): Promise<void> {
-    const message = `${env.APP_NAME}
-اشتراک: ${planName}
-مبلغ: ${amount.toLocaleString('fa-IR')} ریال
-لینک پرداخت: ${paymentUrl}`;
-
-    await this.sendSms(phone, message);
+    const values = {
+      app_name: env.APP_NAME,
+      plan_name: planName,
+      amount: amount.toLocaleString('fa-IR'),
+      payment_url: paymentUrl,
+    };
+    await this.sendPattern(env.SMS.PATTERN_CODE, phone, values);
   }
 
   /**
@@ -93,7 +128,6 @@ export class SmsService {
     const message = `${env.APP_NAME}
 اشتراک ${planName} شما فعال شد.
 تاریخ انقضا: ${endDate.toLocaleDateString('fa-IR')}`;
-
     await this.sendSms(phone, message);
   }
 }
