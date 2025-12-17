@@ -2,10 +2,15 @@ import axios from 'axios';
 
 async function main() {
   const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
+  const apiKey = process.env.MASTER_API_KEY || '';
+  const client = axios.create({
+    baseURL: baseUrl,
+    headers: apiKey ? { 'x-api-key': apiKey } : {},
+  });
 
   const result: Record<string, any> = {};
   try {
-    const health = await axios.get(`${baseUrl}/health`);
+    const health = await client.get(`/health`);
     result.health = health.data?.status || 'unknown';
     if (health.status !== 200 || health.data?.status !== 'ok') {
       throw new Error('Health check failed');
@@ -19,7 +24,7 @@ async function main() {
   let userEmail: string | undefined;
   let userPhone: string | undefined;
   try {
-    const userRes = await axios.post(`${baseUrl}/api/rest/user/create`, {
+    const userRes = await client.post(`/api/user`, {
       email: `user_${Date.now()}@example.com`,
       phone: `09${Math.floor(100000000 + Math.random() * 899999999)}`,
       name: 'Smoke Test User',
@@ -34,7 +39,7 @@ async function main() {
 
   let planId: string | undefined;
   try {
-    const planRes = await axios.post(`${baseUrl}/api/rest/plan/create`, {
+    const planRes = await client.post(`/api/plan`, {
       name: `Smoke Plan ${Date.now()}`,
       description: 'Test plan',
       price: 100000,
@@ -53,7 +58,7 @@ async function main() {
   let authority: string | undefined;
   let subscriptionCreateOk = false;
   try {
-    const subRes = await axios.post(`${baseUrl}/api/rest/subscription/create`, {
+    const subRes = await client.post(`/api/subscription`, {
       userId,
       planId,
       autoRenew: true,
@@ -71,7 +76,7 @@ async function main() {
   // Verify payment via REST
   let verifyOk = false;
   try {
-    const verifyRes = await axios.post(`${baseUrl}/api/rest/payment/verify`, {
+    const verifyRes = await client.post(`/api/payment/verify`, {
       authority,
       status: 'OK',
     });
@@ -80,37 +85,38 @@ async function main() {
     console.error('Payment verify failed:', e?.response?.data?.message || e?.message || e);
   }
 
-  // tRPC: payment.getByAuthority
+  // REST: payment by authority
   let gotByAuthority = false;
   try {
-    const getByAuthorityRes = await axios.post(`${baseUrl}/api/trpc/payment.getByAuthority`, {
-      input: { authority },
+    const getByAuthorityRes = await client.get(`/api/payment/by-authority`, {
+      params: { authority },
     });
     gotByAuthority = Boolean(getByAuthorityRes.data?.authority === authority);
   } catch (e: any) {
-    console.error('tRPC payment.getByAuthority failed:', e?.response?.data?.message || e?.message || e);
+    console.error('REST payment.by-authority failed:', e?.response?.data?.message || e?.message || e);
   }
 
-  // tRPC: payment.getBySubscription
+  // REST: payments by subscription
   let listBySubscriptionOk = false;
   try {
-    const getBySubscriptionRes = await axios.post(`${baseUrl}/api/trpc/payment.getBySubscription`, {
-      input: { subscriptionId },
+    const getBySubscriptionRes = await client.get(`/api/payment/by-subscription`, {
+      params: { subscriptionId },
     });
     listBySubscriptionOk = Array.isArray(getBySubscriptionRes.data) && getBySubscriptionRes.data.length >= 1;
   } catch (e: any) {
-    console.error('tRPC payment.getBySubscription failed:', e?.response?.data?.message || e?.message || e);
+    console.error('REST payment.by-subscription failed:', e?.response?.data?.message || e?.message || e);
   }
 
-  // tRPC: payment.verify (idempotent second call)
-  let trpcVerifyOk = false;
+  // REST: payment.verify (idempotent second call)
+  let restVerifyOk = false;
   try {
-    const trpcVerifyRes = await axios.post(`${baseUrl}/api/trpc/payment.verify`, {
-      input: { authority, status: 'OK' },
+    const restVerifyRes = await client.post(`/api/payment/verify`, {
+      authority,
+      status: 'OK',
     });
-    trpcVerifyOk = Boolean(trpcVerifyRes.data?.success === true);
+    restVerifyOk = Boolean(restVerifyRes.data?.success === true);
   } catch (e: any) {
-    console.error('tRPC payment.verify failed:', e?.response?.data?.message || e?.message || e);
+    console.error('REST payment.verify failed:', e?.response?.data?.message || e?.message || e);
   }
 
   // Callback endpoint (should redirect)
@@ -137,7 +143,7 @@ async function main() {
         verifyOk,
         gotByAuthority,
         listBySubscriptionOk,
-        trpcVerifyOk,
+        restVerifyOk,
         callbackRedirectOk,
       },
       null,

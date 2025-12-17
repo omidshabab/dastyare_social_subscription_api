@@ -1,14 +1,11 @@
 import express from 'express';
-import * as trpcExpress from '@trpc/server/adapters/express';
-import { createContext } from './context';
-import { router } from './trpc';
-import { subscriptionRouter } from './routers/subscription.router';
-import { paymentRouter } from './routers/payment.router';
 import { env } from '../config/env';
 import { PrismaClient } from '@prisma/client';
 import { SubscriptionService } from './services/subscription/subscription.service';
 import { PaymentService } from './services/payment/payment.service';
-import { createSubscriptionSchema, verifyPaymentSchema, createUserSchema, createPlanSchema } from '../utils/validators';
+import { createSubscriptionSchema, verifyPaymentSchema, createUserSchema, createPlanSchema, createApiKeySchema, deactivateApiKeySchema } from '../utils/validators';
+import { ApiKeyService } from './services/apikey/apikey.service';
+import crypto from 'crypto';
 
 /**
  * Main Server Application
@@ -22,16 +19,7 @@ import { createSubscriptionSchema, verifyPaymentSchema, createUserSchema, create
  * - payment: For handling payment verification
  */
 
-// Create the main tRPC app router by combining all sub-routers
-// This is like the "table of contents" for your entire API
-const appRouter = router({
-  subscription: subscriptionRouter,
-  payment: paymentRouter,
-});
-
-// Export the router type - this is what makes tRPC magical!
-// Your Next.js frontend will import this type to get full type safety
-export type AppRouter = typeof appRouter;
+export type AppRouter = never;
 
 // Create Express application
 const app = express();
@@ -45,7 +33,7 @@ app.use(express.json());
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key');
   
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
@@ -53,6 +41,33 @@ app.use((req, res, next) => {
   } else {
     next();
   }
+});
+
+const prisma = new PrismaClient();
+const apiKeyService = new ApiKeyService(prisma);
+
+function extractKey(req: express.Request): string | undefined {
+  const headerKey = (req.header('x-api-key') || '').trim();
+  const auth = (req.header('authorization') || '').trim();
+  const authKey = auth.startsWith('ApiKey ') ? auth.slice(7).trim() : '';
+  const key = headerKey || authKey;
+  return key || undefined;
+}
+
+function isMaster(key?: string): boolean {
+  if (!key || !env.MASTER_API_KEY) return false;
+  return key === env.MASTER_API_KEY;
+}
+
+app.use(async (req, res, next) => {
+  const exempt = req.path === '/health' || req.path === '/api/payment/callback';
+  if (exempt) return next();
+  const key = extractKey(req);
+  if (isMaster(key)) return next();
+  if (!key) return res.status(401).json({ error: 'Unauthorized', message: 'Missing API key' });
+  const ok = await apiKeyService.verifyAndTouch(key);
+  if (!ok) return res.status(401).json({ error: 'Unauthorized', message: 'Invalid API key' });
+  next();
 });
 
 /**
@@ -96,30 +111,54 @@ app.get('/api/payment/callback', (req, res) => {
   );
 });
 
-/**
- * Mount tRPC router on /api/trpc path
- * 
- * This makes all your tRPC procedures available at:
- * POST http://localhost:3001/api/trpc/subscription.create
- * POST http://localhost:3001/api/trpc/payment.verify
- * etc.
- * 
- * The createContext function runs for every request and creates the context
- * (which includes the database connection) that's available to all procedures.
- */
-app.use(
-  '/api/trpc',
-  trpcExpress.createExpressMiddleware({
-    router: appRouter,
-    createContext,
-  })
-);
-
-const prisma = new PrismaClient();
 const subscriptionService = new SubscriptionService(prisma);
 const paymentService = new PaymentService(prisma);
 
-app.post('/api/rest/subscription/create', async (req, res) => {
+function requireMaster(req: express.Request, res: express.Response): boolean {
+  const key = extractKey(req);
+  if (!isMaster(key)) {
+    res.status(403).json({ error: 'Forbidden', message: 'Master API key required' });
+    return false;
+  }
+  return true;
+}
+
+app.post('/api/apikey', async (req, res): Promise<void> => {
+  if (!requireMaster(req, res)) return;
+  try {
+    const input = createApiKeySchema.parse(req.body);
+    const created = await apiKeyService.create(input.label);
+    res.status(201).json(created);
+  } catch (err: any) {
+    res.status(400).json({ error: 'Bad Request', message: err?.message || 'Invalid input' });
+  }
+});
+
+app.get('/api/apikey', async (req, res): Promise<void> => {
+  if (!requireMaster(req, res)) return;
+  try {
+    const list = await apiKeyService.list();
+    res.json(list);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Internal Server Error', message: err?.message || 'Failed to list keys' });
+  }
+});
+
+app.delete('/api/apikey', async (req, res): Promise<void> => {
+  if (!requireMaster(req, res)) return;
+  try {
+    const input = deactivateApiKeySchema.parse(req.body);
+    const ok = await apiKeyService.deactivate(input.id);
+    if (!ok) {
+      res.status(404).json({ error: 'Not Found', message: 'Key not found' });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: 'Bad Request', message: err?.message || 'Invalid input' });
+  }
+});
+app.post('/api/subscription', async (req, res) => {
   try {
     const input = createSubscriptionSchema.parse(req.body);
     const result = await subscriptionService.createSubscription(input);
@@ -132,7 +171,7 @@ app.post('/api/rest/subscription/create', async (req, res) => {
   }
 });
 
-app.post('/api/rest/payment/verify', async (req, res) => {
+app.post('/api/payment/verify', async (req, res) => {
   try {
     const input = verifyPaymentSchema.parse(req.body);
     const payment = await paymentService.verifyPayment(input.authority, input.status);
@@ -165,7 +204,39 @@ app.post('/api/rest/payment/verify', async (req, res) => {
   }
 });
 
-app.post('/api/rest/user/create', async (req, res) => {
+app.get('/api/payment/by-authority', async (req, res) => {
+  try {
+    const authority = String(req.query.authority || '');
+    if (!authority) {
+      res.status(400).json({ error: 'Bad Request', message: 'authority is required' });
+      return;
+    }
+    const payment = await paymentService.getPaymentByAuthority(authority);
+    if (!payment) {
+      res.status(404).json({ error: 'Not Found', message: 'Payment not found' });
+      return;
+    }
+    res.json(payment);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Internal Server Error', message: err?.message || 'Failed to fetch payment' });
+  }
+});
+
+app.get('/api/payment/by-subscription', async (req, res) => {
+  try {
+    const subscriptionId = String(req.query.subscriptionId || '');
+    if (!subscriptionId) {
+      res.status(400).json({ error: 'Bad Request', message: 'subscriptionId is required' });
+      return;
+    }
+    const payments = await paymentService.getPaymentsBySubscription(subscriptionId);
+    res.json(payments);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Internal Server Error', message: err?.message || 'Failed to list payments' });
+  }
+});
+
+app.post('/api/user', async (req, res) => {
   try {
     const input = createUserSchema.parse(req.body);
     const user = await prisma.user.create({
@@ -184,7 +255,7 @@ app.post('/api/rest/user/create', async (req, res) => {
   }
 });
 
-app.post('/api/rest/plan/create', async (req, res) => {
+app.post('/api/plan', async (req, res) => {
   try {
     const input = createPlanSchema.parse(req.body);
     const plan = await subscriptionService.createPlan({
@@ -216,7 +287,6 @@ app.use('*', (req, res) => {
     message: 'The requested endpoint does not exist',
     availableEndpoints: {
       health: 'GET /health',
-      trpc: 'POST /api/trpc/*',
       paymentCallback: 'GET /api/payment/callback'
     }
   });
@@ -255,7 +325,6 @@ app.listen(PORT, () => {
   ╠════════════════════════════════════════╣
   ║  Endpoints:                            ║
   ║  • Health: GET /health                 ║
-  ║  • tRPC: POST /api/trpc/*              ║
   ║  • Callback: GET /api/payment/callback ║
   ╚════════════════════════════════════════╝
   `);

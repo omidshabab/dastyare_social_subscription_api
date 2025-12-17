@@ -10,6 +10,7 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().default('http://localhost:3000'),
   APP_NAME: z.string().default('Subscription API'),
   NODE_ENV: z.string().default('development'),
+  MASTER_API_KEY: z.string().optional(),
   ZARINPAL: z.object({
     MERCHANT_ID: z.string().default('zarinpal-merchant-id'),
     SANDBOX: z.boolean().default(true),
@@ -37,6 +38,7 @@ const parsedEnv = {
   FRONTEND_URL: process.env.FRONTEND_URL,
   APP_NAME: process.env.APP_NAME,
   NODE_ENV: process.env.NODE_ENV,
+  MASTER_API_KEY: process.env.MASTER_API_KEY,
   ZARINPAL: {
     MERCHANT_ID: process.env.ZARINPAL_MERCHANT_ID,
     SANDBOX: process.env.ZARINPAL_SANDBOX === 'true',

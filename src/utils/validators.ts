@@ -29,3 +29,11 @@ export const createPlanSchema = z.object({
   features: z.string().optional(),
   isActive: z.boolean().optional(),
 });
+
+export const createApiKeySchema = z.object({
+  label: z.string().optional(),
+});
+
+export const deactivateApiKeySchema = z.object({
+  id: z.string(),
+});
