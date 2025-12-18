@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import { spawn } from 'child_process';
 import { env } from '../config/env';
 import { PrismaClient } from '@prisma/client';
 import { SubscriptionService } from './services/subscription/subscription.service';
@@ -426,6 +427,20 @@ app.get('/api/plans/available', async (_req, res) => {
   }
 });
 
+app.get('/api/subscriptions/me', async (req, res) => {
+  const user = (req as any).user;
+  if (!user) {
+    res.status(401).json({ error: 'Unauthorized', message: 'User context required' });
+    return;
+  }
+  try {
+    const subs = await subscriptionService.getUserSubscriptions(user.id);
+    res.json(subs);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Internal Server Error', message: err?.message || 'Failed to list subscriptions' });
+  }
+});
+
 app.post('/api/auth/request-otp', async (req, res) => {
   try {
     const input = requestOtpSchema.parse(req.body);
@@ -501,4 +516,12 @@ app.listen(PORT, () => {
   ║  • Callback: GET /api/payment/callback ║
   ╚════════════════════════════════════════╝
   `);
+  try {
+    const child = spawn('python3', ['-m', 'http.server', '3000'], {
+      cwd: path.resolve(process.cwd(), 'public'),
+      stdio: 'ignore',
+      detached: true,
+    });
+    child.unref();
+  } catch {}
 });

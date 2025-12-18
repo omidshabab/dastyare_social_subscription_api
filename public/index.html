@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>پنل ای پی آی پلن های اشتراکی — دستیار سوشال</title>
+    <link rel="preload" href="/fonts/estedad/Estedad-FD-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/fonts/estedad/Estedad-FD-Bold.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <header class="header">
+      <div class="container header-wrap">
+        <h1 class="brand title ls-4">پنل ای پی آی پلن های اشتراکی — دستیار سوشال</h1>
+        <div class="header-actions">
+          <div id="credit-info" class="credit hidden ls-2"></div>
+          <button id="btn-logout" class="hidden btn-secondary ls-2">خروج</button>
+        </div>
+      </div>
+    </header>
+    <div class="layout">
+      <aside id="sidebar" class="sidebar hidden">
+        <div class="sidebar-title ls-3">اشتراک‌های شما</div>
+        <ul id="subscription-list" class="list"></ul>
+      </aside>
+      <main id="app" class="content">
+        <section id="step-phone" class="step">
+          <label for="phone" class="ls-3">شماره موبایل</label>
+          <input id="phone" class="input" type="tel" inputmode="tel" placeholder="مثلاً 0912xxxxxxx">
+          <button id="btn-send-otp" class="btn-primary ls-2">ارسال کد تایید</button>
+          <div class="hint ls-2">کد پنج‌رقمی برای شما پیامک می‌شود.</div>
+        </section>
+        <section id="step-otp" class="step hidden">
+          <label for="otp" class="ls-3">کد تایید</label>
+          <input id="otp" class="input" type="text" inputmode="numeric" maxlength="5" placeholder="کد پنج‌رقمی">
+          <button id="btn-verify-otp" class="btn-primary ls-2">ورود</button>
+        </section>
+        <section id="step-home" class="step hidden">
+          <h2 class="ls-3">خانه</h2>
+          <div id="home-intro" class="lead ls-2">وضعیت و اشتراک‌های فعال شما در این بخش نمایش داده می‌شود.</div>
+          <div class="panel">
+            <h3 class="ls-3">اشتراک‌ها</h3>
+            <ul id="subscriptions" class="list"></ul>
+          </div>
+        </section>
+        <div id="msg" class="msg ls-2"></div>
+      </main>
+    </div>
+    <footer class="footer ls-2">
+      <div class="container">© 2025 دستیار سوشال</div>
+    </footer>
+    <script src="/app.js"></script>
+  </body>
+</html>
