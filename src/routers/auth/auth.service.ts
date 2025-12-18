@@ -1,6 +1,6 @@
 import { PrismaClient, User, OtpCode } from '@prisma/client';
 import crypto from 'crypto';
-import { env } from '../../../config/env';
+import { env } from '../../config/env';
 import { SmsService } from '../notification/sms.service';
 
 type RateEntry = { count: number; windowStart: number };

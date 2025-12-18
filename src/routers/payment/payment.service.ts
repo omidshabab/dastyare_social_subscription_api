@@ -1,5 +1,5 @@
 import { PrismaClient, Payment } from '@prisma/client';
-import { PaymentStatus } from '../../../types/enums';
+import { PaymentStatus } from '../../types/enums';
 import { getPaymentGateway } from './gateways';
 import { GatewayCredentialService } from './gateway-credential.service';
 import { NotificationService } from '../notification/notification.service';
@@ -10,9 +10,9 @@ import {
   CreatePaymentResponse,
   VerifyPaymentRequest,
   VerifyPaymentResponse,
-} from '../../../types/payment.types';
-import { NotFoundError, PaymentGatewayError } from '../../../utils/errors';
-import { env } from '../../../config/env';
+} from '../../types/payment.types';
+import { NotFoundError, PaymentGatewayError } from '../../utils/errors';
+import { env } from '../../config/env';
 
 /**
  * Payment Service

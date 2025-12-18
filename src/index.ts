@@ -1,18 +1,18 @@
 import express from 'express';
 import path from 'path';
 import { spawn } from 'child_process';
-import { env } from '../config/env';
+import { env } from './config/env';
 import { PrismaClient } from '@prisma/client';
-import { SubscriptionService } from './services/subscription/subscription.service';
-import { PaymentService } from './services/payment/payment.service';
-import { createSubscriptionSchema, verifyPaymentSchema, createUserSchema, createPlanSchema, createApiKeySchema, deactivateApiKeySchema, upsertGatewayCredentialSchema } from '../utils/validators';
-import { ApiKeyService } from './services/apikey/apikey.service';
-import { AuditService } from './services/audit/audit.service';
-import { AuthService } from './services/auth/auth.service';
-import { WebhookService } from './services/webhook/webhook.service';
-import { createWebhookSchema, updateWebhookSchema, requestOtpSchema, verifyOtpSchema } from '../utils/validators';
-import { GatewayCredentialService } from './services/payment/gateway-credential.service';
-import { getSupportedGateways } from './services/payment/gateways';
+import { SubscriptionService } from './routers/subscription/subscription.service';
+import { PaymentService } from './routers/payment/payment.service';
+import { createSubscriptionSchema, verifyPaymentSchema, createUserSchema, createPlanSchema, createApiKeySchema, deactivateApiKeySchema, upsertGatewayCredentialSchema } from './utils/validators';
+import { ApiKeyService } from './routers/apikey/apikey.service';
+import { AuditService } from './routers/audit/audit.service';
+import { AuthService } from './routers/auth/auth.service';
+import { WebhookService } from './routers/webhook/webhook.service';
+import { createWebhookSchema, updateWebhookSchema, requestOtpSchema, verifyOtpSchema } from './utils/validators';
+import { GatewayCredentialService } from './routers/payment/gateway-credential.service';
+import { getSupportedGateways } from './routers/payment/gateways';
 
 /**
  * Main Server Application

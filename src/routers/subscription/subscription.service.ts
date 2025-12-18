@@ -1,9 +1,9 @@
 import { PrismaClient, Subscription, Plan } from '@prisma/client';
-import { SubscriptionStatus } from '../../../types/enums';
+import { SubscriptionStatus } from '../../types/enums';
 import { PaymentService } from '../payment/payment.service';
 import { NotificationService } from '../notification/notification.service';
-import { CreateSubscriptionInput } from '../../../types/subscription.types';
-import { NotFoundError } from '../../../utils/errors';
+import { CreateSubscriptionInput } from '../../types/subscription.types';
+import { NotFoundError } from '../../utils/errors';
 import { WebhookService } from '../webhook/webhook.service';
 import { AuditService } from '../audit/audit.service';
 

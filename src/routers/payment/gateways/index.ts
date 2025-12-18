@@ -1,8 +1,8 @@
-import { IPaymentGateway, PaymentGatewayConfig } from '../../../../types/payment.types';
+import { IPaymentGateway, PaymentGatewayConfig } from '../../../types/payment.types';
 import { ZarinpalGateway } from './zarinpal.gateway';
 import { MockGateway } from './mock.gateway';
 import { ZibalGateway } from './zibal.gateway';
-import { ValidationError } from '../../../../utils/errors';
+import { ValidationError } from '../../../utils/errors';
 
 /**
  * Gateway Factory

@@ -2,11 +2,11 @@
   "name": "dastyare_social_subscription_api",
   "version": "1.0.0",
   "description": "Payment subscription API with multiple gateway support",
-  "main": "dist/server/index.js",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon",
     "build": "tsc",
-    "start": "node dist/server/index.js",
+    "start": "node dist/index.js",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",

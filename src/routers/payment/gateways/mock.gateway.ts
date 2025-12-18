@@ -4,7 +4,7 @@ import {
   CreatePaymentResponse,
   VerifyPaymentRequest,
   VerifyPaymentResponse,
-} from '../../../../types/payment.types';
+} from '../../../types/payment.types';
 
 export class MockGateway extends BasePaymentGateway {
   name = 'mock';

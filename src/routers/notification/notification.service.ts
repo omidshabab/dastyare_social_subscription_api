@@ -1,6 +1,6 @@
 import { SmsService } from './sms.service';
 import { EmailService } from './email.service';
-import { GenericNotificationInput } from '../../../types/subscription.types';
+import { GenericNotificationInput } from '../../types/subscription.types';
 
 /**
  * Notification Service

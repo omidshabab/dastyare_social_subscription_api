@@ -5,7 +5,7 @@ import {
   VerifyPaymentRequest,
   VerifyPaymentResponse,
   PaymentGatewayConfig,
-} from '../../../../types/payment.types';
+} from '../../../types/payment.types';
 
 /**
  * Abstract base class for payment gateways

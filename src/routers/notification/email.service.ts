@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { env } from '../../../config/env';
+import { env } from '../../config/env';
 
 export class EmailService {
   private resend?: Resend;

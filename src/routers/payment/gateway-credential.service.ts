@@ -1,6 +1,6 @@
 import { PrismaClient, GatewayCredential } from '@prisma/client';
-import { PaymentGatewayConfig } from '../../../types/payment.types';
-import { NotFoundError, ValidationError } from '../../../utils/errors';
+import { PaymentGatewayConfig } from '../../types/payment.types';
+import { NotFoundError, ValidationError } from '../../utils/errors';
 
 export class GatewayCredentialService {
   private prisma: PrismaClient;

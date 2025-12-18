@@ -6,9 +6,9 @@ import {
   VerifyPaymentRequest,
   VerifyPaymentResponse,
   PaymentGatewayConfig,
-} from '../../../../types/payment.types';
-import { PaymentGatewayError } from '../../../../utils/errors';
-import { env } from '../../../../config/env';
+} from '../../../types/payment.types';
+import { PaymentGatewayError } from '../../../utils/errors';
+import { env } from '../../../config/env';
 
 export class ZibalGateway extends BasePaymentGateway {
   name = 'zibal';
