@@ -19,7 +19,7 @@ export class ZibalGateway extends BasePaymentGateway {
 
   constructor(config?: PaymentGatewayConfig) {
     const effectiveConfig: PaymentGatewayConfig = config || {
-      merchantId: env.ZIBAL.MERCHANT_ID || (env.ZIBAL.SANDBOX ? 'zibal' : ''),
+      merchantId: '',
       sandbox: env.ZIBAL.SANDBOX,
     };
     super(effectiveConfig);

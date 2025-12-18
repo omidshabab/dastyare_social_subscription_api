@@ -13,7 +13,8 @@
     "db:generate": "prisma generate",
     "test:api": "curl -sSf http://localhost:3001/health >/dev/null && echo \"Health OK\" || (echo \"Health FAILED\" && exit 1)",
     "test:smoke": "ts-node scripts/smoke.ts",
-    "test:all": "npm run test:api && npm run test:smoke"
+    "test:access": "ts-node scripts/test_access.ts",
+    "test:all": "npm run test:api && npm run test:smoke && npm run test:access"
   },
   "keywords": [],
   "author": "",

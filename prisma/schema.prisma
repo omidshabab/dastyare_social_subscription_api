@@ -18,6 +18,7 @@ model User {
   apiKeys       ApiKey[]
   webhooks      Webhook[]
   auditLogs     AuditLog[]
+  gatewayCredentials GatewayCredential[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -142,4 +143,17 @@ model AuditLog {
 enum Role {
   ADMIN
   USER
+}
+
+model GatewayCredential {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  gateway    String
+  merchantId String
+  sandbox    Boolean  @default(true)
+  config     Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@unique([userId, gateway])
 }

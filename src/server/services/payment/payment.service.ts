@@ -1,6 +1,7 @@
 import { PrismaClient, Payment } from '@prisma/client';
 import { PaymentStatus } from '../../../types/enums';
 import { getPaymentGateway } from './gateways';
+import { GatewayCredentialService } from './gateway-credential.service';
 import { NotificationService } from '../notification/notification.service';
 import { WebhookService } from '../webhook/webhook.service';
 import { AuditService } from '../audit/audit.service';
@@ -31,12 +32,14 @@ export class PaymentService {
   private notificationService: NotificationService;
   private webhookService: WebhookService;
   private audit: AuditService;
+  private gatewayCreds: GatewayCredentialService;
 
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
     this.notificationService = new NotificationService();
     this.webhookService = new WebhookService(prisma);
     this.audit = new AuditService(prisma);
+    this.gatewayCreds = new GatewayCredentialService(prisma);
   }
 
   /**
@@ -73,8 +76,8 @@ export class PaymentService {
       throw new NotFoundError('Subscription');
     }
 
-    // Get the appropriate payment gateway instance
-    const paymentGateway = getPaymentGateway(gateway);
+    const config = await this.gatewayCreds.requireConfig(subscription.userId, gateway);
+    const paymentGateway = getPaymentGateway(gateway, config);
 
     // Prepare the payment request for the gateway
     const paymentRequest: CreatePaymentRequest = {
@@ -190,8 +193,8 @@ export class PaymentService {
       return payment;
     }
 
-    // Get the payment gateway and verify the payment
-    const paymentGateway = getPaymentGateway(payment.gateway);
+    const config = await this.gatewayCreds.requireConfig(payment.subscription.userId, payment.gateway);
+    const paymentGateway = getPaymentGateway(payment.gateway, config);
     
     const verifyRequest: VerifyPaymentRequest = {
       authority: payment.authority!,

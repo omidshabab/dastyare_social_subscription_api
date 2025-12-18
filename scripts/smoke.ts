@@ -3,6 +3,7 @@ import axios from 'axios';
 async function main() {
   const baseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
   const apiKey = process.env.MASTER_API_KEY || '';
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   const client = axios.create({
     baseURL: baseUrl,
     headers: apiKey ? { 'x-api-key': apiKey } : {},
@@ -28,6 +29,12 @@ async function main() {
       email: `user_${Date.now()}@example.com`,
       phone: `09${Math.floor(100000000 + Math.random() * 899999999)}`,
       name: 'Smoke Test User',
+    }, {
+      headers: {
+        'x-api-key': apiKey,
+        'Origin': frontendUrl,
+        'Referer': `${frontendUrl}/`,
+      },
     });
     userId = userRes.data.id;
     userEmail = userRes.data.email;

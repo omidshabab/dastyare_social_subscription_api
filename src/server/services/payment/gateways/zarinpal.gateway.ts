@@ -31,11 +31,7 @@ export class ZarinpalGateway extends BasePaymentGateway {
   private gatewayUrl: string;
 
   constructor(config?: PaymentGatewayConfig) {
-    // Use config from constructor or fall back to environment variables
-    super(config || {
-      merchantId: env.ZARINPAL.MERCHANT_ID,
-      sandbox: env.ZARINPAL.SANDBOX,
-    });
+    super(config || { merchantId: '', sandbox: env.ZARINPAL.SANDBOX });
 
     // Set URLs based on sandbox mode
     this.requestUrl = env.ZARINPAL.REQUEST_URL;

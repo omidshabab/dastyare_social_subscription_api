@@ -59,3 +59,10 @@ export const updateWebhookSchema = z.object({
   isActive: z.boolean().optional(),
   eventTypes: z.array(z.string()).optional(),
 });
+
+export const upsertGatewayCredentialSchema = z.object({
+  gateway: z.string().min(2),
+  merchantId: z.string().min(2),
+  sandbox: z.boolean().optional(),
+  config: z.record(z.any()).optional(),
+});

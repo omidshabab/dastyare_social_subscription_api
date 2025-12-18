@@ -103,4 +103,20 @@ export class AuthService {
 
     return { user, apiKey: apiKeyPlain };
   }
+
+  async validateOtp(rawPhone: string, code: string): Promise<boolean> {
+    const phone = this.normalizePhone(rawPhone);
+    const record = await this.prisma.otpCode.findFirst({
+      where: { phone, usedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!record) return false;
+    const codeHash = this.hashCode(code);
+    const ok = record.codeHash === codeHash;
+    await this.prisma.otpCode.update({
+      where: { id: record.id },
+      data: { attempts: record.attempts + 1, usedAt: ok ? new Date() : record.usedAt },
+    });
+    return ok;
+  }
 }

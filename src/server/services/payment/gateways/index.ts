@@ -1,4 +1,4 @@
-import { IPaymentGateway } from '../../../../types/payment.types';
+import { IPaymentGateway, PaymentGatewayConfig } from '../../../../types/payment.types';
 import { ZarinpalGateway } from './zarinpal.gateway';
 import { MockGateway } from './mock.gateway';
 import { ZibalGateway } from './zibal.gateway';
@@ -17,13 +17,10 @@ import { ValidationError } from '../../../../utils/errors';
  * - Type-safe way to get gateways
  */
 
-// Registry of available payment gateways
-const gatewayRegistry: Record<string, () => IPaymentGateway> = {
-  zarinpal: () => new ZarinpalGateway(),
+const gatewayRegistry: Record<string, (config?: PaymentGatewayConfig) => IPaymentGateway> = {
+  zarinpal: (config?: PaymentGatewayConfig) => new ZarinpalGateway(config),
   mock: () => new MockGateway(),
-  // Add more gateways here as you implement them:
-  zibal: () => new ZibalGateway(),
-  // idpay: () => new IdPayGateway(),
+  zibal: (config?: PaymentGatewayConfig) => new ZibalGateway(config),
 };
 
 /**
@@ -33,7 +30,7 @@ const gatewayRegistry: Record<string, () => IPaymentGateway> = {
  * @returns Instance of the requested payment gateway
  * @throws ValidationError if gateway is not supported
  */
-export function getPaymentGateway(gatewayName: string): IPaymentGateway {
+export function getPaymentGateway(gatewayName: string, config?: PaymentGatewayConfig): IPaymentGateway {
   const gatewayFactory = gatewayRegistry[gatewayName.toLowerCase()];
   
   if (!gatewayFactory) {
@@ -42,7 +39,7 @@ export function getPaymentGateway(gatewayName: string): IPaymentGateway {
     );
   }
 
-  return gatewayFactory();
+  return gatewayFactory(config);
 }
 
 /**

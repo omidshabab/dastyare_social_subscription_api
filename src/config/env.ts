@@ -12,14 +12,12 @@ const envSchema = z.object({
   NODE_ENV: z.string().default('development'),
   MASTER_API_KEY: z.string().optional(),
   ZARINPAL: z.object({
-    MERCHANT_ID: z.string().default('zarinpal-merchant-id'),
     SANDBOX: z.boolean().default(true),
     REQUEST_URL: z.string().default('https://sandbox.zarinpal.com/pg/v4/payment/request.json'),
     VERIFY_URL: z.string().default('https://sandbox.zarinpal.com/pg/v4/payment/verify.json'),
     GATEWAY_URL: z.string().default('https://sandbox.zarinpal.com/pg/StartPay/'),
   }),
   ZIBAL: z.object({
-    MERCHANT_ID: z.string().default('zibal'),
     SANDBOX: z.boolean().default(true),
     REQUEST_URL: z.string().default('https://api.zibal.ir/v1/request'),
     VERIFY_URL: z.string().default('https://api.zibal.ir/v1/verify'),
@@ -51,14 +49,12 @@ const parsedEnv = {
   NODE_ENV: process.env.NODE_ENV,
   MASTER_API_KEY: process.env.MASTER_API_KEY,
   ZARINPAL: {
-    MERCHANT_ID: process.env.ZARINPAL_MERCHANT_ID,
     SANDBOX: process.env.ZARINPAL_SANDBOX === 'true',
     REQUEST_URL: process.env.ZARINPAL_REQUEST_URL,
     VERIFY_URL: process.env.ZARINPAL_VERIFY_URL,
     GATEWAY_URL: process.env.ZARINPAL_GATEWAY_URL,
   },
   ZIBAL: {
-    MERCHANT_ID: process.env.ZIBAL_MERCHANT_ID,
     SANDBOX: process.env.ZIBAL_SANDBOX === 'true',
     REQUEST_URL: process.env.ZIBAL_REQUEST_URL,
     VERIFY_URL: process.env.ZIBAL_VERIFY_URL,

@@ -4,12 +4,14 @@ import { env } from '../config/env';
 import { PrismaClient } from '@prisma/client';
 import { SubscriptionService } from './services/subscription/subscription.service';
 import { PaymentService } from './services/payment/payment.service';
-import { createSubscriptionSchema, verifyPaymentSchema, createUserSchema, createPlanSchema, createApiKeySchema, deactivateApiKeySchema } from '../utils/validators';
+import { createSubscriptionSchema, verifyPaymentSchema, createUserSchema, createPlanSchema, createApiKeySchema, deactivateApiKeySchema, upsertGatewayCredentialSchema } from '../utils/validators';
 import { ApiKeyService } from './services/apikey/apikey.service';
 import { AuditService } from './services/audit/audit.service';
 import { AuthService } from './services/auth/auth.service';
 import { WebhookService } from './services/webhook/webhook.service';
 import { createWebhookSchema, updateWebhookSchema, requestOtpSchema, verifyOtpSchema } from '../utils/validators';
+import { GatewayCredentialService } from './services/payment/gateway-credential.service';
+import { getSupportedGateways } from './services/payment/gateways';
 
 /**
  * Main Server Application
@@ -60,7 +62,7 @@ app.get('/docs', (_req, res) => {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Dastyare Subscription API Docs</title>
+    <title>Dastyare Social Subscription API Docs</title>
     <meta name="description" content="Complete API reference with real-world examples" />
     <style>
       html, body, #app { height: 100%; margin: 0; }
@@ -74,7 +76,7 @@ app.get('/docs', (_req, res) => {
         theme: 'purple',
         url: '/openapi.yaml',
         metaData: {
-          title: 'Dastyare Subscription API Docs',
+          title: 'Dastyare Social Subscription API Docs',
           description: 'Complete API reference with real-world examples',
         },
       });
@@ -88,6 +90,7 @@ const apiKeyService = new ApiKeyService(prisma);
 const authService = new AuthService(prisma);
 const webhookService = new WebhookService(prisma);
 const audit = new AuditService(prisma);
+const gatewayCreds = new GatewayCredentialService(prisma);
 
 function extractKey(req: express.Request): string | undefined {
   const headerKey = (req.header('x-api-key') || '').trim();
@@ -175,6 +178,15 @@ function requireMaster(req: express.Request, res: express.Response): boolean {
   return true;
 }
 
+function isFrontendRequest(req: express.Request): boolean {
+  const origin = (req.header('origin') || '').trim();
+  const referer = (req.header('referer') || '').trim();
+  const allowed = env.FRONTEND_URL;
+  return Boolean(allowed && (origin === allowed || (referer && referer.startsWith(allowed))));
+}
+
+// Removed phone-based master verification; master key alone is sufficient
+
 app.post('/api/apikey', async (req, res): Promise<void> => {
   if (!requireMaster(req, res)) return;
   try {
@@ -187,6 +199,46 @@ app.post('/api/apikey', async (req, res): Promise<void> => {
       metadata: { label: created.label },
     });
     res.status(201).json(created);
+  } catch (err: any) {
+    res.status(400).json({ error: 'Bad Request', message: err?.message || 'Invalid input' });
+  }
+});
+
+app.get('/api/gateways/supported', async (_req, res): Promise<void> => {
+  res.json(getSupportedGateways());
+});
+
+app.get('/api/gateway/credentials', async (req, res): Promise<void> => {
+  const user = (req as any).user;
+  if (!user) {
+    res.status(401).json({ error: 'Unauthorized', message: 'User context required' });
+    return;
+  }
+  try {
+    const list = await gatewayCreds.list(user.id);
+    res.json(list);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Internal Server Error', message: err?.message || 'Failed to list credentials' });
+  }
+});
+
+app.post('/api/gateway/credential', async (req, res): Promise<void> => {
+  const user = (req as any).user;
+  if (!user) {
+    res.status(401).json({ error: 'Unauthorized', message: 'User context required' });
+    return;
+  }
+  try {
+    const input = upsertGatewayCredentialSchema.parse(req.body);
+    const saved = await gatewayCreds.upsert(user.id, input.gateway, input.merchantId, input.sandbox, input.config);
+    await audit.log({
+      userId: user.id,
+      action: 'GATEWAY_CREDENTIAL_UPSERTED',
+      targetType: 'GatewayCredential',
+      targetId: saved.id,
+      metadata: { gateway: saved.gateway },
+    });
+    res.status(201).json(saved);
   } catch (err: any) {
     res.status(400).json({ error: 'Bad Request', message: err?.message || 'Invalid input' });
   }
@@ -313,6 +365,10 @@ app.get('/api/payment/by-subscription', async (req, res) => {
 });
 
 app.post('/api/user', async (req, res) => {
+  if (!isFrontendRequest(req)) {
+    res.status(403).json({ error: 'Forbidden', message: 'Endpoint restricted to frontend origin' });
+    return;
+  }
   if (!requireMaster(req, res)) return;
   try {
     const input = createUserSchema.parse(req.body);
@@ -323,6 +379,12 @@ app.post('/api/user', async (req, res) => {
         name: input.name,
         role: 'USER',
       },
+    });
+    await audit.log({
+      action: 'ADMIN_USER_CREATED',
+      targetType: 'User',
+      targetId: user.id,
+      metadata: { email: user.email, phone: user.phone },
     });
     res.json(user);
   } catch (err: any) {
@@ -383,170 +445,7 @@ app.post('/api/auth/verify-otp', async (req, res) => {
   }
 });
 
-app.post('/api/me/apikey', async (req, res) => {
-  try {
-    const user = (req as any).user;
-    if (!user) {
-      res.status(401).json({ error: 'Unauthorized', message: 'User API key required' });
-      return;
-    }
-    const created = await apiKeyService.createForUser(user.id, String(req.body?.label || ''));
-    await audit.log({
-      userId: user.id,
-      action: 'APIKEY_CREATED',
-      targetType: 'ApiKey',
-      targetId: created.id,
-      metadata: { label: created.label },
-    });
-    res.status(201).json(created);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Internal Server Error', message: err?.message || 'Failed to create key' });
-  }
-});
-
-app.post('/api/me/apikey/rotate', async (req, res) => {
-  try {
-    const user = (req as any).user;
-    if (!user) {
-      res.status(401).json({ error: 'Unauthorized', message: 'User API key required' });
-      return;
-    }
-    const id = String(req.body?.id || '');
-    if (!id) {
-      res.status(400).json({ error: 'Bad Request', message: 'id is required' });
-      return;
-    }
-    const ok = await apiKeyService.deactivateForUser(id, user.id);
-    if (!ok) {
-      res.status(404).json({ error: 'Not Found', message: 'Key not found' });
-      return;
-    }
-    const created = await apiKeyService.createForUser(user.id, 'rotated');
-    await audit.log({
-      userId: user.id,
-      action: 'APIKEY_ROTATED',
-      targetType: 'ApiKey',
-      targetId: created.id,
-      metadata: { previousId: id },
-    });
-    res.json(created);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Internal Server Error', message: err?.message || 'Failed to rotate key' });
-  }
-});
-
-app.delete('/api/me/apikey/:id', async (req, res) => {
-  try {
-    const user = (req as any).user;
-    if (!user) {
-      res.status(401).json({ error: 'Unauthorized', message: 'User API key required' });
-      return;
-    }
-    const id = String(req.params.id || '');
-    const ok = await apiKeyService.deactivateForUser(id, user.id);
-    if (!ok) {
-      res.status(404).json({ error: 'Not Found', message: 'Key not found' });
-      return;
-    }
-    await audit.log({
-      userId: user.id,
-      action: 'APIKEY_REVOKED',
-      targetType: 'ApiKey',
-      targetId: id,
-    });
-    res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Internal Server Error', message: err?.message || 'Failed to revoke key' });
-  }
-});
-
-app.get('/api/me/payments', async (req, res) => {
-  try {
-    const user = (req as any).user;
-    if (!user) {
-      res.status(401).json({ error: 'Unauthorized', message: 'User API key required' });
-      return;
-    }
-    const payments = await prisma.payment.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-    });
-    res.json(payments);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Internal Server Error', message: err?.message || 'Failed to list payments' });
-  }
-});
-
-app.get('/api/me/webhooks', async (req, res) => {
-  try {
-    const user = (req as any).user;
-    if (!user) {
-      res.status(401).json({ error: 'Unauthorized', message: 'User API key required' });
-      return;
-    }
-    const list = await webhookService.list(user.id);
-    res.json(list);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Internal Server Error', message: err?.message || 'Failed to list webhooks' });
-  }
-});
-
-app.post('/api/me/webhooks', async (req, res) => {
-  try {
-    const user = (req as any).user;
-    if (!user) {
-      res.status(401).json({ error: 'Unauthorized', message: 'User API key required' });
-      return;
-    }
-    const input = createWebhookSchema.parse(req.body);
-    const created = await webhookService.create(user.id, input.url, input.eventTypes, input.secret);
-    res.status(201).json(created);
-  } catch (err: any) {
-    res.status(400).json({ error: 'Bad Request', message: err?.message || 'Invalid input' });
-  }
-});
-
-app.put('/api/me/webhooks', async (req, res) => {
-  try {
-    const user = (req as any).user;
-    if (!user) {
-      res.status(401).json({ error: 'Unauthorized', message: 'User API key required' });
-      return;
-    }
-    const input = updateWebhookSchema.parse(req.body);
-    const updated = await webhookService.update(user.id, input.id, {
-      url: input.url,
-      isActive: input.isActive,
-      eventTypes: input.eventTypes,
-    });
-    if (!updated) {
-      res.status(404).json({ error: 'Not Found', message: 'Webhook not found' });
-      return;
-    }
-    res.json(updated);
-  } catch (err: any) {
-    res.status(400).json({ error: 'Bad Request', message: err?.message || 'Invalid input' });
-  }
-});
-
-app.delete('/api/me/webhooks/:id', async (req, res) => {
-  try {
-    const user = (req as any).user;
-    if (!user) {
-      res.status(401).json({ error: 'Unauthorized', message: 'User API key required' });
-      return;
-    }
-    const id = String(req.params.id || '');
-    const ok = await webhookService.remove(user.id, id);
-    if (!ok) {
-      res.status(404).json({ error: 'Not Found', message: 'Webhook not found' });
-      return;
-    }
-    res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Internal Server Error', message: err?.message || 'Failed to delete webhook' });
-  }
-});
+// /api/me routes removed
 
 /**
  * Catch-all route for undefined endpoints
