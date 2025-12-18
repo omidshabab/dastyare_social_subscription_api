@@ -83,7 +83,7 @@ export class SubscriptionService {
     const payment = await this.paymentService.createPayment(
       subscription.id,
       plan.price,
-      input.gateway || 'zarinpal',
+      plan.gateway,
       input.userEmail,
       input.userPhone
     );
@@ -295,6 +295,7 @@ export class SubscriptionService {
     duration: number;
     features?: any;
     isActive?: boolean;
+    gateway: string;
   }): Promise<Plan> {
     return this.prisma.plan.create({
       data: {
@@ -305,6 +306,7 @@ export class SubscriptionService {
         duration: data.duration,
         features: data.features,
         isActive: data.isActive ?? true,
+        gateway: data.gateway,
       },
     });
   }

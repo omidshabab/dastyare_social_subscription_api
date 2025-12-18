@@ -32,6 +32,7 @@ model Plan {
   duration      Int
   features      String?
   isActive      Boolean        @default(true)
+  gateway       String
   subscriptions Subscription[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt

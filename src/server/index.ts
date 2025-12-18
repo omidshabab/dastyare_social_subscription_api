@@ -73,7 +73,7 @@ app.get('/docs', (_req, res) => {
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
     <script>
       Scalar.createApiReference('#app', {
-        theme: 'purple',
+        theme: 'orange',
         url: '/openapi.yaml',
         metaData: {
           title: 'Dastyare Social Subscription API Docs',
@@ -406,6 +406,7 @@ app.post('/api/plan', async (req, res) => {
       duration: input.duration,
       features: input.features,
       isActive: input.isActive,
+      gateway: input.gateway,
     });
     res.json(plan);
   } catch (err: any) {

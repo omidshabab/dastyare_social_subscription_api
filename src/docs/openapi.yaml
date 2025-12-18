@@ -64,6 +64,9 @@ components:
           nullable: true
         isActive:
           type: boolean
+        gateway:
+          type: string
+          description: Payment gateway used for this plan
         createdAt:
           type: string
           format: date-time
@@ -187,7 +190,10 @@ paths:
     post:
       tags: [Subscription]
       summary: Create subscription and initiate payment
-      description: Validates plan, creates subscription (PENDING), and returns payment link.
+      description: >
+        Validates plan, creates subscription (PENDING), and returns payment link.
+        Payment gateway is determined by the plan's configured `gateway`. Clients
+        must not send `gateway` in the subscription request.
       security:
         - ApiKeyHeader: []
         - AuthorizationApiKey: []
@@ -201,17 +207,15 @@ paths:
                 userId: { type: string }
                 planId: { type: string }
                 autoRenew: { type: boolean }
-                gateway: { type: string }
                 userEmail: { type: string }
                 userPhone: { type: string }
               required: [userId, planId]
             examples:
-              zarinpal:
+              subscription:
                 value:
                   userId: cu123
                   planId: pln_monthly
                   autoRenew: true
-                  gateway: zarinpal
                   userEmail: user@example.com
                   userPhone: "09120000000"
       responses:
@@ -426,7 +430,8 @@ paths:
                 duration: { type: integer }
                 features: { type: string }
                 isActive: { type: boolean }
-              required: [name, price, duration]
+                gateway: { type: string }
+              required: [name, price, duration, gateway]
             examples:
               monthly:
                 value:
@@ -437,6 +442,7 @@ paths:
                   duration: 30
                   features: "feature1,feature2"
                   isActive: true
+                  gateway: zarinpal
       responses:
         '200':
           description: Created plan

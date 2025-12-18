@@ -4,7 +4,6 @@ export interface CreateSubscriptionInput {
   userId: string;
   planId: string;
   autoRenew?: boolean;
-  gateway?: string;
   userEmail?: string;
   userPhone?: string;
 }

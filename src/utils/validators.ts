@@ -9,10 +9,9 @@ export const createSubscriptionSchema = z.object({
   userId: z.string(),
   planId: z.string(),
   autoRenew: z.boolean().optional(),
-  gateway: z.string().optional(),
   userEmail: z.string().email().optional(),
   userPhone: z.string().optional(),
-});
+}).strict();
 
 export const createUserSchema = z.object({
   email: z.string().email().optional(),
@@ -28,6 +27,7 @@ export const createPlanSchema = z.object({
   duration: z.number().int(),
   features: z.string().optional(),
   isActive: z.boolean().optional(),
+  gateway: z.string().min(2),
 });
 
 export const createApiKeySchema = z.object({
