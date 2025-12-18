@@ -2,6 +2,8 @@ import { PrismaClient, Payment } from '@prisma/client';
 import { PaymentStatus } from '../../../types/enums';
 import { getPaymentGateway } from './gateways';
 import { NotificationService } from '../notification/notification.service';
+import { WebhookService } from '../webhook/webhook.service';
+import { AuditService } from '../audit/audit.service';
 import {
   CreatePaymentRequest,
   CreatePaymentResponse,
@@ -27,10 +29,14 @@ import { env } from '../../../config/env';
 export class PaymentService {
   private prisma: PrismaClient;
   private notificationService: NotificationService;
+  private webhookService: WebhookService;
+  private audit: AuditService;
 
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
     this.notificationService = new NotificationService();
+    this.webhookService = new WebhookService(prisma);
+    this.audit = new AuditService(prisma);
   }
 
   /**
@@ -100,6 +106,7 @@ export class PaymentService {
         status: PaymentStatus.PENDING,
         userEmail,
         userPhone,
+        userId: subscription.userId,
         metadata: JSON.stringify({
           gatewayTxId: gatewayResponse.gatewayTxId,
           message: gatewayResponse.message,
@@ -120,6 +127,14 @@ export class PaymentService {
     await this.prisma.payment.update({
       where: { id: payment.id },
       data: { notificationSent: true },
+    });
+
+    await this.audit.log({
+      userId: subscription.userId,
+      action: 'PAYMENT_CREATED',
+      targetType: 'Payment',
+      targetId: payment.id,
+      metadata: { amount, gateway },
     });
 
     return payment;
@@ -221,6 +236,27 @@ export class PaymentService {
         },
       },
     });
+
+    await this.audit.log({
+      userId: updatedPayment.subscription.userId,
+      action: 'PAYMENT_COMPLETED',
+      targetType: 'Payment',
+      targetId: updatedPayment.id,
+      metadata: { refId: verifyResponse.refId },
+    });
+
+    await this.webhookService.dispatch(
+      updatedPayment.subscription.userId,
+      'payment.completed',
+      {
+        id: updatedPayment.id,
+        subscriptionId: updatedPayment.subscriptionId,
+        amount: updatedPayment.amount,
+        currency: updatedPayment.currency,
+        refId: verifyResponse.refId,
+        status: updatedPayment.status,
+      }
+    );
 
     return updatedPayment;
   }

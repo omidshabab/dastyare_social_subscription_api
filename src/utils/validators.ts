@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const verifyPaymentSchema = z.object({
   authority: z.string(),
-  status: z.string(),
+  status: z.string().optional(),
 });
 
 export const createSubscriptionSchema = z.object({
@@ -36,4 +36,26 @@ export const createApiKeySchema = z.object({
 
 export const deactivateApiKeySchema = z.object({
   id: z.string(),
+});
+
+export const requestOtpSchema = z.object({
+  phone: z.string().min(10),
+});
+
+export const verifyOtpSchema = z.object({
+  phone: z.string().min(10),
+  code: z.string().min(4).max(6),
+});
+
+export const createWebhookSchema = z.object({
+  url: z.string().url(),
+  eventTypes: z.array(z.string()).min(1),
+  secret: z.string().optional(),
+});
+
+export const updateWebhookSchema = z.object({
+  id: z.string(),
+  url: z.string().url().optional(),
+  isActive: z.boolean().optional(),
+  eventTypes: z.array(z.string()).optional(),
 });

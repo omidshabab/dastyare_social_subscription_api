@@ -18,9 +18,23 @@ const envSchema = z.object({
     VERIFY_URL: z.string().default('https://sandbox.zarinpal.com/pg/v4/payment/verify.json'),
     GATEWAY_URL: z.string().default('https://sandbox.zarinpal.com/pg/StartPay/'),
   }),
+  ZIBAL: z.object({
+    MERCHANT_ID: z.string().default('zibal'),
+    SANDBOX: z.boolean().default(true),
+    REQUEST_URL: z.string().default('https://api.zibal.ir/v1/request'),
+    VERIFY_URL: z.string().default('https://api.zibal.ir/v1/verify'),
+    GATEWAY_URL: z.string().default('https://gateway.zibal.ir/start/'),
+  }),
   SMS: z.object({
     API_KEY: z.string().optional(),
     PATTERN_CODE: z.string().optional(),
+    OTP_PATTERN_CODE: z.string().optional(),
+  }),
+  AUTH: z.object({
+    OTP_EXP_MIN: z.number().default(5),
+    OTP_LENGTH: z.number().default(5),
+    RATE_LIMIT_WINDOW_SEC: z.number().default(60),
+    RATE_LIMIT_MAX_REQUESTS: z.number().default(3),
   }),
   RESEND: z.object({
     API_KEY: z.string().optional(),
@@ -43,9 +57,23 @@ const parsedEnv = {
     VERIFY_URL: process.env.ZARINPAL_VERIFY_URL,
     GATEWAY_URL: process.env.ZARINPAL_GATEWAY_URL,
   },
+  ZIBAL: {
+    MERCHANT_ID: process.env.ZIBAL_MERCHANT_ID,
+    SANDBOX: process.env.ZIBAL_SANDBOX === 'true',
+    REQUEST_URL: process.env.ZIBAL_REQUEST_URL,
+    VERIFY_URL: process.env.ZIBAL_VERIFY_URL,
+    GATEWAY_URL: process.env.ZIBAL_GATEWAY_URL,
+  },
   SMS: {
     API_KEY: process.env.SMS_API_KEY,
     PATTERN_CODE: process.env.SMS_PATTERN_CODE,
+    OTP_PATTERN_CODE: process.env.SMS_OTP_PATTERN_CODE,
+  },
+  AUTH: {
+    OTP_EXP_MIN: Number(process.env.AUTH_OTP_EXP_MIN || 5),
+    OTP_LENGTH: Number(process.env.AUTH_OTP_LENGTH || 5),
+    RATE_LIMIT_WINDOW_SEC: Number(process.env.RATE_LIMIT_WINDOW_SEC || 60),
+    RATE_LIMIT_MAX_REQUESTS: Number(process.env.RATE_LIMIT_MAX_REQUESTS || 3),
   },
   RESEND: {
     API_KEY: process.env.RESEND_API_KEY,

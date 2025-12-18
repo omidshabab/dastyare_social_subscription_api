@@ -12,8 +12,12 @@ model User {
   email         String?        @unique
   phone         String?        @unique
   name          String?
+  role          Role           @default(USER)
   subscriptions Subscription[]
   payments      Payment[]
+  apiKeys       ApiKey[]
+  webhooks      Webhook[]
+  auditLogs     AuditLog[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -75,7 +79,67 @@ model ApiKey {
   label      String?
   hash       String   @unique
   isActive   Boolean  @default(true)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   lastUsedAt DateTime?
+}
+
+model OtpCode {
+  id         String   @id @default(cuid())
+  phone      String
+  codeHash   String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  attempts   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@index([phone, expiresAt])
+}
+
+model Webhook {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  url        String
+  secret     String
+  isActive   Boolean  @default(true)
+  eventTypes Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deliveries WebhookDelivery[]
+  @@index([userId])
+}
+
+model WebhookDelivery {
+  id           String   @id @default(cuid())
+  webhookId    String
+  webhook      Webhook  @relation(fields: [webhookId], references: [id])
+  eventType    String
+  payload      Json
+  signature    String
+  status       String   @default("PENDING") // PENDING, SUCCESS, FAILED
+  attemptCount Int      @default(0)
+  lastAttemptAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([webhookId, status])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  targetType String?
+  targetId   String?
+  ip         String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+}
+
+enum Role {
+  ADMIN
+  USER
 }

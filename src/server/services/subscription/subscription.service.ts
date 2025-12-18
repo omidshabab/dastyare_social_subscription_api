@@ -4,6 +4,8 @@ import { PaymentService } from '../payment/payment.service';
 import { NotificationService } from '../notification/notification.service';
 import { CreateSubscriptionInput } from '../../../types/subscription.types';
 import { NotFoundError } from '../../../utils/errors';
+import { WebhookService } from '../webhook/webhook.service';
+import { AuditService } from '../audit/audit.service';
 
 /**
  * Subscription Service
@@ -22,11 +24,15 @@ export class SubscriptionService {
   private prisma: PrismaClient;
   private paymentService: PaymentService;
   private notificationService: NotificationService;
+  private webhookService: WebhookService;
+  private audit: AuditService;
 
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
     this.paymentService = new PaymentService(prisma);
     this.notificationService = new NotificationService();
+    this.webhookService = new WebhookService(prisma);
+    this.audit = new AuditService(prisma);
   }
 
   /**
@@ -149,6 +155,26 @@ export class SubscriptionService {
       userPhone,
       subscription.plan.name,
       endDate
+    );
+
+    await this.audit.log({
+      userId: updatedSubscription.userId,
+      action: 'SUBSCRIPTION_ACTIVATED',
+      targetType: 'Subscription',
+      targetId: updatedSubscription.id,
+      metadata: { planId: updatedSubscription.planId },
+    });
+
+    await this.webhookService.dispatch(
+      updatedSubscription.userId,
+      'subscription.activated',
+      {
+        id: updatedSubscription.id,
+        userId: updatedSubscription.userId,
+        planId: updatedSubscription.planId,
+        startDate: updatedSubscription.startDate,
+        endDate: updatedSubscription.endDate,
+      }
     );
 
     return updatedSubscription;

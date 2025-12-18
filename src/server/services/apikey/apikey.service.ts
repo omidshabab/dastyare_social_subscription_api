@@ -1,4 +1,4 @@
-import { PrismaClient, ApiKey } from '@prisma/client';
+import { PrismaClient, ApiKey, User } from '@prisma/client';
 import crypto from 'crypto';
 
 export class ApiKeyService {
@@ -13,6 +13,16 @@ export class ApiKeyService {
     const hash = this.hash(key);
     const created = await this.prisma.apiKey.create({
       data: { label, hash },
+      select: { id: true, label: true },
+    });
+    return { id: created.id, key, label: created.label || undefined };
+  }
+
+  async createForUser(userId: string, label?: string): Promise<{ id: string; key: string; label?: string }> {
+    const key = crypto.randomBytes(32).toString('hex');
+    const hash = this.hash(key);
+    const created = await this.prisma.apiKey.create({
+      data: { userId, label, hash },
       select: { id: true, label: true },
     });
     return { id: created.id, key, label: created.label || undefined };
@@ -42,14 +52,24 @@ export class ApiKeyService {
     return true;
   }
 
-  async verifyAndTouch(key: string): Promise<boolean> {
+  async deactivateForUser(id: string, userId: string): Promise<boolean> {
+    const found = await this.prisma.apiKey.findUnique({ where: { id } });
+    if (!found || found.userId !== userId) return false;
+    await this.prisma.apiKey.update({
+      where: { id },
+      data: { isActive: false },
+    });
+    return true;
+  }
+
+  async verifyAndTouch(key: string): Promise<{ ok: boolean; user?: User | null }> {
     const hash = this.hash(key);
-    const found = await this.prisma.apiKey.findUnique({ where: { hash } });
-    if (!found || !found.isActive) return false;
+    const found = await this.prisma.apiKey.findUnique({ where: { hash }, include: { user: true } });
+    if (!found || !found.isActive) return { ok: false };
     await this.prisma.apiKey.update({
       where: { id: found.id },
       data: { lastUsedAt: new Date() },
     });
-    return true;
+    return { ok: true, user: found.user || null };
   }
 }

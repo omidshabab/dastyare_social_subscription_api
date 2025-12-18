@@ -1,0 +1,797 @@
+openapi: 3.1.0
+info:
+  title: Dastyare Social Subscription API
+  version: 1.0.0
+  description: >
+    Comprehensive OpenAPI documentation for the Subscription and Payment API.
+    This API manages users, subscription plans, payments via multiple gateways
+    (e.g., Zarinpal, Zibal), and API keys for authentication.
+    Most endpoints require an API key provided via the `X-API-Key` header
+    or `Authorization: ApiKey <key>`. The master API key is required for API key
+    management endpoints.
+servers:
+  - url: http://localhost:3001
+    description: Local development server
+  - url: ${API_BASE_URL}
+    description: Environment-configured server
+tags:
+  - name: Subscription
+    description: Subscription lifecycle endpoints
+  - name: Payment
+    description: Payment processing and verification
+  - name: User
+    description: Basic user management
+  - name: Plan
+    description: Subscription plan management
+  - name: Auth
+    description: Phone-based OTP authentication
+  - name: Webhook
+    description: User-managed webhooks
+  - name: Me
+    description: Endpoints for the authenticated user
+components:
+  securitySchemes:
+    ApiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Regular API key
+    AuthorizationApiKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Use format `ApiKey <key>`
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Plan:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        price:
+          type: integer
+        currency:
+          type: string
+          default: IRR
+        duration:
+          type: integer
+          description: Duration in days
+        features:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        planId:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, ACTIVE, EXPIRED, CANCELLED]
+        startDate:
+          type: string
+          format: date-time
+          nullable: true
+        endDate:
+          type: string
+          format: date-time
+          nullable: true
+        autoRenew:
+          type: boolean
+        plan:
+          $ref: '#/components/schemas/Plan'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+        subscriptionId:
+          type: string
+        amount:
+          type: integer
+        currency:
+          type: string
+        gateway:
+          type: string
+        authority:
+          type: string
+        paymentUrl:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, COMPLETED, FAILED]
+        gatewayTxId:
+          type: string
+          nullable: true
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+        verifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        notificationSent:
+          type: boolean
+        metadata:
+          type: string
+          nullable: true
+        userEmail:
+          type: string
+          nullable: true
+        userPhone:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ApiKey:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+    ApiKeyCreateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        label:
+          type: string
+          nullable: true
+    Webhook:
+      type: object
+      properties:
+        id: { type: string }
+        url: { type: string }
+        isActive: { type: boolean }
+        eventTypes:
+          type: array
+          items: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OtpRequest:
+      type: object
+      properties:
+        phone: { type: string }
+    OtpVerify:
+      type: object
+      properties:
+        phone: { type: string }
+        code: { type: string }
+paths:
+  /api/payment/callback:
+    get:
+      tags: [Payment]
+      summary: Payment gateway callback
+      description: >
+        Redirect endpoint used by payment gateways (e.g., Zarinpal). Accepts query
+        params and redirects the user to the frontend verification page.
+      security: []
+      parameters:
+        - in: query
+          name: Authority
+          schema: { type: string }
+        - in: query
+          name: Status
+          schema: { type: string }
+        - in: query
+          name: trackId
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        '302':
+          description: Redirect to frontend verification page
+          headers:
+            Location:
+              description: Frontend verification URL
+              schema:
+                type: string
+          content:
+            text/plain:
+              examples:
+                redirect:
+                  value: Redirecting...
+  /api/subscription:
+    post:
+      tags: [Subscription]
+      summary: Create subscription and initiate payment
+      description: Validates plan, creates subscription (PENDING), and returns payment link.
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId: { type: string }
+                planId: { type: string }
+                autoRenew: { type: boolean }
+                gateway: { type: string }
+                userEmail: { type: string }
+                userPhone: { type: string }
+              required: [userId, planId]
+            examples:
+              zarinpal:
+                value:
+                  userId: cu123
+                  planId: pln_monthly
+                  autoRenew: true
+                  gateway: zarinpal
+                  userEmail: user@example.com
+                  userPhone: "09120000000"
+      responses:
+        '200':
+          description: Subscription created with payment details
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    subscription:
+                      id: sub_abc123
+                      userId: cu123
+                      planId: pln_monthly
+                      status: PENDING
+                      autoRenew: true
+                      plan:
+                        id: pln_monthly
+                        name: Monthly
+                        price: 100000
+                        currency: IRR
+                        duration: 30
+                        isActive: true
+                      createdAt: 2024-01-15T12:34:56.000Z
+                      updatedAt: 2024-01-15T12:34:56.000Z
+                    payment:
+                      id: pay_xyz789
+                      amount: 100000
+                      currency: IRR
+                      paymentUrl: https://gateway.example.com/pay/abc
+                      authority: A000000000000
+                      status: PENDING
+        '400':
+          description: Invalid input or inactive plan
+  /api/plans/available:
+    get:
+      tags: [Plan]
+      summary: List available active plans
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      responses:
+        '200':
+          description: Array of active plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Plan'
+  /api/auth/request-otp:
+    post:
+      tags: [Auth]
+      summary: Request OTP code for phone
+      description: Sends a 5-digit OTP via ippanel pattern route. Rate-limited.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpRequest'
+      responses:
+        '200':
+          description: OTP issued
+        '429':
+          description: Rate limited
+  /api/auth/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Verify OTP and receive API key
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerify'
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              examples:
+                success:
+                  value:
+                    user:
+                      id: usr_abc
+                      phone: "09120000000"
+                    apiKey: "secret-api-key"
+        '400':
+          description: Invalid OTP
+  /api/me/payments:
+    get:
+      tags: [Me]
+      summary: List my payment history
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      responses:
+        '200':
+          description: Array of payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+  /api/me/apikey:
+    post:
+      tags: [Me]
+      summary: Create a new API key for my account
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyCreateResponse'
+  /api/me/apikey/rotate:
+    post:
+      tags: [Me]
+      summary: Rotate an existing API key (deactivate and issue new)
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+      responses:
+        '200':
+          description: New key issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyCreateResponse'
+  /api/me/apikey/{id}:
+    delete:
+      tags: [Me]
+      summary: Revoke an API key
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Revoked
+  /api/me/webhooks:
+    get:
+      tags: [Webhook]
+      summary: List my webhooks
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      responses:
+        '200':
+          description: Array of webhooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Webhook'
+    post:
+      tags: [Webhook]
+      summary: Create a webhook
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url: { type: string }
+                eventTypes:
+                  type: array
+                  items: { type: string }
+                secret: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+    put:
+      tags: [Webhook]
+      summary: Update a webhook
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+                url: { type: string }
+                isActive: { type: boolean }
+                eventTypes:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: Updated
+  /api/me/webhooks/{id}:
+    delete:
+      tags: [Webhook]
+      summary: Delete a webhook
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/payment/verify:
+    post:
+      tags: [Payment]
+      summary: Verify payment and optionally activate subscription
+      description: Verifies payment using gateway and marks subscription ACTIVE if completed.
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                authority: { type: string }
+                status: { type: string }
+              required: [authority]
+            examples:
+              ok:
+                value:
+                  authority: A000000000000
+                  status: OK
+      responses:
+        '200':
+          description: Verification result
+          content:
+            application/json:
+              examples:
+                completed:
+                  value:
+                    success: true
+                    payment:
+                      id: pay_xyz789
+                      amount: 100000
+                      currency: IRR
+                      status: COMPLETED
+                      paidAt: 2024-01-15T12:40:00.000Z
+                      gatewayTxId: 123456789
+                    subscriptionId: sub_abc123
+                pending:
+                  value:
+                    success: false
+                    payment:
+                      id: pay_xyz789
+                      amount: 100000
+                      currency: IRR
+                      status: PENDING
+                      paidAt: null
+                      gatewayTxId: null
+                    subscriptionId: sub_abc123
+        '400':
+          description: Invalid input or verification failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/payment/by-authority:
+    get:
+      tags: [Payment]
+      summary: Get payment by authority
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      parameters:
+        - in: query
+          name: authority
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          description: Missing authority
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/payment/by-subscription:
+    get:
+      tags: [Payment]
+      summary: List payments by subscription
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      parameters:
+        - in: query
+          name: subscriptionId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payments list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+        '400':
+          description: Missing subscriptionId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/apikey:
+    post:
+      tags: [User]
+      summary: Create API key (master only)
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyCreateResponse'
+    get:
+      tags: [User]
+      summary: List API keys (master only)
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      responses:
+        '200':
+          description: API keys
+    delete:
+      tags: [User]
+      summary: Deactivate API key (master only)
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+              required: [id]
+      responses:
+        '200':
+          description: Deactivated
+  /api/user:
+    post:
+      tags: [User]
+      summary: Create user
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string }
+                phone: { type: string }
+                name: { type: string }
+            examples:
+              example:
+                value:
+                  email: user@example.com
+                  phone: "09120000000"
+                  name: Test User
+      responses:
+        '200':
+          description: Created user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/plan:
+    post:
+      tags: [Plan]
+      summary: Create plan
+      security:
+        - ApiKeyHeader: []
+        - AuthorizationApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                price: { type: integer }
+                currency: { type: string }
+                duration: { type: integer }
+                features: { type: string }
+                isActive: { type: boolean }
+              required: [name, price, duration]
+            examples:
+              monthly:
+                value:
+                  name: Monthly
+                  description: 30 day access
+                  price: 100000
+                  currency: IRR
+                  duration: 30
+                  features: "feature1,feature2"
+                  isActive: true
+      responses:
+        '200':
+          description: Created plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plan'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+security:
+  - ApiKeyHeader: []
+  - AuthorizationApiKey: []

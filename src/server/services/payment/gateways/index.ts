@@ -1,6 +1,7 @@
 import { IPaymentGateway } from '../../../../types/payment.types';
 import { ZarinpalGateway } from './zarinpal.gateway';
 import { MockGateway } from './mock.gateway';
+import { ZibalGateway } from './zibal.gateway';
 import { ValidationError } from '../../../../utils/errors';
 
 /**
@@ -21,7 +22,7 @@ const gatewayRegistry: Record<string, () => IPaymentGateway> = {
   zarinpal: () => new ZarinpalGateway(),
   mock: () => new MockGateway(),
   // Add more gateways here as you implement them:
-  // zibal: () => new ZibalGateway(),
+  zibal: () => new ZibalGateway(),
   // idpay: () => new IdPayGateway(),
 };
 
@@ -54,4 +55,4 @@ export function getSupportedGateways(): string[] {
 }
 
 // Export individual gateways for direct use if needed
-export { ZarinpalGateway };
+export { ZarinpalGateway, ZibalGateway };
