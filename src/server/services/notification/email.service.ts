@@ -18,7 +18,7 @@ export class EmailService {
       }
 
       const { error } = await this.resend.emails.send({
-        from: env.RESEND.FROM || env.EMAIL.FROM || 'no-reply@resend.dev',
+        from: env.RESEND.FROM || 'no-reply@resend.dev',
         to,
         subject,
         html,

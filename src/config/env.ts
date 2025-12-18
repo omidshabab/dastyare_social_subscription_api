@@ -26,13 +26,6 @@ const envSchema = z.object({
     API_KEY: z.string().optional(),
     FROM: z.string().optional(),
   }),
-  EMAIL: z.object({
-    HOST: z.string().optional(),
-    PORT: z.coerce.number().optional(),
-    USER: z.string().optional(),
-    PASS: z.string().optional(),
-    FROM: z.string().optional(),
-  }),
 });
 
 const parsedEnv = {
